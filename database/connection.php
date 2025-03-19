@@ -3,13 +3,12 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Configure session
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', 0); // Set to 1 if using HTTPS
-
 // Only start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
+    // Configure session before starting it
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_secure', 0); // Set to 1 if using HTTPS
     session_start();
 }
 
@@ -27,30 +26,36 @@ try {
 }
 
 // Sanitize input
-function sanitize($input) {
-    if (is_array($input)) {
-        return array_map('sanitize', $input);
+if (!function_exists('sanitize')) {
+    function sanitize($input) {
+        if (is_array($input)) {
+            return array_map('sanitize', $input);
+        }
+        return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
     }
-    return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
 
 // Flash message helper
-function setFlashMessage($type, $message) {
-    if (!isset($_SESSION['flash'])) {
-        $_SESSION['flash'] = [];
+if (!function_exists('setFlashMessage')) {
+    function setFlashMessage($type, $message) {
+        if (!isset($_SESSION['flash'])) {
+            $_SESSION['flash'] = [];
+        }
+        $_SESSION['flash'] = [
+            'type' => $type,
+            'message' => $message
+        ];
     }
-    $_SESSION['flash'] = [
-        'type' => $type,
-        'message' => $message
-    ];
 }
 
-function getFlashMessage() {
-    if (isset($_SESSION['flash'])) {
-        $flash = $_SESSION['flash'];
-        unset($_SESSION['flash']);
-        return $flash;
+if (!function_exists('getFlashMessage')) {
+    function getFlashMessage() {
+        if (isset($_SESSION['flash'])) {
+            $flash = $_SESSION['flash'];
+            unset($_SESSION['flash']);
+            return $flash;
+        }
+        return null;
     }
-    return null;
 }
 ?>

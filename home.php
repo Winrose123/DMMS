@@ -241,9 +241,9 @@ if (isset($_SESSION['user_id'])) {
                     <p>Pure, fresh, and organic dairy products straight from the farm. Efficiently track milk production, manage records, and access financial insights.</p>
                     <div>
                         <a href="login.php" class="btn btn-primary">Get Started</a>
-                        <button class="btn btn-secondary">
+                      <!--  <button class="btn btn-secondary">
                             <i class="fas fa-play me-2"></i>Watch Video
-                        </button>
+                        </button> -->
                     </div>
                 </div>
                 <div class="col-lg-6 text-center">

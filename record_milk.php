@@ -1,7 +1,17 @@
 <?php
+session_start();
 require_once 'database/connection.php';
 require_once 'database/auth.php';
-requireAdmin();
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+if (!isAdmin()) {
+    header('Location: access_denied.php');
+    exit();
+}
 
 // Get all farmers with their IDs
 $farmers = $pdo->query("
@@ -129,7 +139,7 @@ $today_records = $pdo->query("
                                     <div class="mb-3">
                                         <label for="image" class="form-label">Image (Optional)</label>
                                         <input type="file" class="form-control" id="image" name="image" 
-                                            accept="image/jpeg,image/png" onchange="previewImage(this);">
+                                            accept="image/jpeg,image/png" onchange="window.previewImage(this);">
                                         <div class="form-text">Upload an image of the milk measurement</div>
                                         <div id="imagePreview" class="mt-2" style="display: none;">
                                             <img id="preview" src="#" alt="Preview" class="img-fluid rounded" style="max-height: 200px;">
@@ -163,12 +173,13 @@ $today_records = $pdo->query("
                                                 <th>Price/L</th>
                                                 <th>Total</th>
                                                 <th>Image</th>
+                                                <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <?php if (empty($today_records)): ?>
                                                 <tr>
-                                                    <td colspan="6" class="text-center text-muted">
+                                                    <td colspan="7" class="text-center text-muted">
                                                         No records for today
                                                     </td>
                                                 </tr>
@@ -181,14 +192,35 @@ $today_records = $pdo->query("
                                                         <td>Ksh <?= number_format($record['price_per_liter'], 2) ?></td>
                                                         <td>Ksh <?= number_format($record['quantity_liters'] * $record['price_per_liter'], 2) ?></td>
                                                         <td>
-                                                            <?php if ($record['image_url']): ?>
-                                                                <a href="<?= $record['image_url'] ?>" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                                    <i class="fas fa-image"></i>
-                                                                </a>
+                                                            <?php if (!empty($record['image_url'])): ?>
+                                                                <img src="<?= htmlspecialchars($record['image_url']) ?>" 
+                                                                     class="img-thumbnail recordImage" 
+                                                                     alt="Record image" 
+                                                                     title="Click to view full size"
+                                                                     style="max-width: 50px; cursor: pointer;"
+                                                                     onclick="window.open(this.src, '_blank');">
                                                             <?php else: ?>
                                                                 <span class="text-muted">No image</span>
                                                             <?php endif; ?>
                                                         </td>
+                                                        <?php if (isAdmin()): ?>
+                                                            <td>
+                                                                <div class="btn-group">
+                                                                    <a href="edit_milk_record.php?id=<?= $record['id']?>" 
+                                                                       class="btn btn-sm btn-outline-primary" 
+                                                                       title="Edit record">
+                                                                        <i class="fas fa-pencil-alt"></i>
+                                                                    </a>
+                                                                    <button type="button" 
+                                                                            class="btn btn-sm btn-outline-danger deleteRecord" 
+                                                                            data-name="<?= htmlspecialchars($record['farmer_name'])?>" 
+                                                                            data-recordid="<?= $record['id']?>"
+                                                                            title="Delete record">
+                                                                        <i class="fas fa-trash-alt"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        <?php endif; ?>
                                                     </tr>
                                                 <?php endforeach; ?>
                                             <?php endif; ?>
@@ -205,24 +237,93 @@ $today_records = $pdo->query("
 
     <?php include 'partials/app-scripts.php'; ?>
     <script>
-        function previewImage(input) {
-            const preview = document.getElementById('preview');
-            const previewDiv = document.getElementById('imagePreview');
-            
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    previewDiv.style.display = 'block';
+        $(function() {
+            // Image preview functionality
+            const previewImage = function(input) {
+                if (input.files && input.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const preview = document.getElementById('preview');
+                        if (preview) {
+                            preview.src = e.target.result;
+                            document.getElementById('imagePreview').style.display = 'block';
+                        }
+                    }
+                    reader.readAsDataURL(input.files[0]);
                 }
-                
-                reader.readAsDataURL(input.files[0]);
-            } else {
-                preview.src = '#';
-                previewDiv.style.display = 'none';
-            }
-        }
+            };
+
+            // Make previewImage function globally accessible
+            window.previewImage = previewImage;
+
+            // Initialize tooltips
+            $('[title]').tooltip();
+
+            // Handle delete record functionality
+            $(document).on('click', '.deleteRecord', async function(e) {
+                e.preventDefault();
+                const recordId = $(this).data('recordid');
+                const farmerName = $(this).data('name');
+
+                const result = await Swal.fire({
+                    title: 'Confirm Deletion',
+                    html: `Are you sure you want to delete the record for <strong>${farmerName}</strong>?<br>
+                           <small class="text-muted">This action cannot be undone.</small>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: '<i class="fas fa-trash"></i> Delete',
+                    cancelButtonText: '<i class="fas fa-times"></i> Cancel'
+                });
+
+                if (result.isConfirmed) {
+                    // Show loading state
+                    Swal.fire({
+                        title: 'Deleting...',
+                        html: '<i class="fas fa-spinner fa-spin"></i>',
+                        allowOutsideClick: false,
+                        showConfirmButton: false
+                    });
+
+                    try {
+                        const response = await $.ajax({
+                            method: 'POST',
+                            url: 'database/delete.php',
+                            data: {
+                                id: recordId,
+                                table: 'milk_records'
+                            },
+                            dataType: 'json'
+                        });
+
+                        if (response.success) {
+                            await Swal.fire({
+                                title: 'Success!',
+                                text: response.message || 'Record deleted successfully.',
+                                icon: 'success',
+                                confirmButtonColor: '#198754'
+                            });
+                            window.location.reload();
+                        } else {
+                            await Swal.fire({
+                                title: 'Error!',
+                                text: response.message || 'Failed to delete record.',
+                                icon: 'error',
+                                confirmButtonColor: '#dc3545'
+                            });
+                        }
+                    } catch (error) {
+                        await Swal.fire({
+                            title: 'Server Error!',
+                            text: 'Failed to process your request. Please try again.',
+                            icon: 'error',
+                            confirmButtonColor: '#dc3545'
+                        });
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>

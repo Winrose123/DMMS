@@ -364,74 +364,80 @@ $farmer_distribution = $pdo->query("
     
     <script>
         // Production Chart
-        const productionCtx = document.getElementById('productionChart').getContext('2d');
-        new Chart(productionCtx, {
-            type: 'line',
-            data: {
-                labels: <?= json_encode(array_map(function($item) { 
-                    return date('M Y', strtotime($item['month'] . '-01')); 
-                }, $monthly_production)) ?>,
-                datasets: [{
-                    label: 'Total Liters',
-                    data: <?= json_encode(array_map(function($item) { 
-                        return $item['total_liters']; 
+        const productionCanvas = document.getElementById('productionChart');
+        if (productionCanvas) {
+            const productionCtx = productionCanvas.getContext('2d');
+            new Chart(productionCtx, {
+                type: 'line',
+                data: {
+                    labels: <?= json_encode(array_map(function($item) { 
+                        return date('M Y', strtotime($item['month'] . '-01')); 
                     }, $monthly_production)) ?>,
-                    borderColor: '#2563eb',
-                    backgroundColor: '#3b82f680',
-                    fill: true
-                }, {
-                    label: 'Active Farmers',
-                    data: <?= json_encode(array_map(function($item) { 
-                        return $item['farmers_count']; 
-                    }, $monthly_production)) ?>,
-                    borderColor: '#059669',
-                    backgroundColor: '#34d39980',
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
+                    datasets: [{
+                        label: 'Total Liters',
+                        data: <?= json_encode(array_map(function($item) { 
+                            return $item['total_liters']; 
+                        }, $monthly_production)) ?>,
+                        borderColor: '#2563eb',
+                        backgroundColor: '#3b82f680',
+                        fill: true
+                    }, {
+                        label: 'Active Farmers',
+                        data: <?= json_encode(array_map(function($item) { 
+                            return $item['farmers_count']; 
+                        }, $monthly_production)) ?>,
+                        borderColor: '#059669',
+                        backgroundColor: '#34d39980',
+                        fill: true
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true
+                options: {
+                    responsive: true,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
 
         // Farmer Distribution Chart
-        const farmerCtx = document.getElementById('farmerChart').getContext('2d');
-        new Chart(farmerCtx, {
-            type: 'doughnut',
-            data: {
-                labels: <?= json_encode(array_map(function($item) { 
-                    return $item['activity_level']; 
-                }, $farmer_distribution)) ?>,
-                datasets: [{
-                    data: <?= json_encode(array_map(function($item) { 
-                        return $item['farmer_count']; 
+        const farmerCanvas = document.getElementById('farmerChart');
+        if (farmerCanvas) {
+            const farmerCtx = farmerCanvas.getContext('2d');
+            new Chart(farmerCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: <?= json_encode(array_map(function($item) { 
+                        return $item['activity_level']; 
                     }, $farmer_distribution)) ?>,
-                    backgroundColor: [
-                        '#dc2626',  // Inactive - Red
-                        '#f59e0b',  // Low Activity - Orange
-                        '#2563eb',  // Moderate - Blue
-                        '#059669'   // High Activity - Green
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
+                    datasets: [{
+                        data: <?= json_encode(array_map(function($item) { 
+                            return $item['farmer_count']; 
+                        }, $farmer_distribution)) ?>,
+                        backgroundColor: [
+                            '#dc2626',  // Inactive - Red
+                            '#f59e0b',  // Low Activity - Orange
+                            '#2563eb',  // Moderate - Blue
+                            '#059669'   // High Activity - Green
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     </script>
 </body>
 </html>

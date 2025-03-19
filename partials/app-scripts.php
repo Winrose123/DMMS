@@ -1,5 +1,5 @@
-   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="js/scripts.js"></script>
 
@@ -108,75 +108,6 @@ const submitForm = async (formElement, successMessage = 'Operation successful') 
         console.error('Form submission error:', error);
         return false;
     }
-};
-
-// Table search and filter
-const initializeTableSearch = (tableId, inputId) => {
-    const searchInput = document.getElementById(inputId);
-    const table = document.getElementById(tableId);
-    const rows = table.getElementsByTagName('tr');
-
-    searchInput.addEventListener('keyup', function() {
-        const query = this.value.toLowerCase();
-        
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            const cells = row.getElementsByTagName('td');
-            let found = false;
-
-            for (let j = 0; j < cells.length; j++) {
-                const cell = cells[j];
-                if (cell.textContent.toLowerCase().indexOf(query) > -1) {
-                    found = true;
-                    break;
-                }
-            }
-
-            row.style.display = found ? '' : 'none';
-        }
-    });
-};
-
-// Print functionality
-const printElement = (elementId) => {
-    const element = document.getElementById(elementId);
-    const originalContents = document.body.innerHTML;
-
-    document.body.innerHTML = element.innerHTML;
-    window.print();
-    document.body.innerHTML = originalContents;
-    
-    // Reinitialize any necessary scripts
-    location.reload();
-};
-
-// Export table to CSV
-const exportTableToCSV = (tableId, filename) => {
-    const table = document.getElementById(tableId);
-    const rows = table.getElementsByTagName('tr');
-    let csv = [];
-    
-    for (let i = 0; i < rows.length; i++) {
-        const row = [], cols = rows[i].querySelectorAll('td, th');
-        
-        for (let j = 0; j < cols.length; j++) {
-            let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ');
-            data = data.replace(/"/g, '""');
-            row.push('"' + data + '"');
-        }
-        csv.push(row.join(','));
-    }
-
-    const csvFile = new Blob([csv.join('\n')], { type: 'text/csv' });
-    const downloadLink = document.createElement('a');
-    
-    downloadLink.download = filename;
-    downloadLink.href = window.URL.createObjectURL(csvFile);
-    downloadLink.style.display = 'none';
-    
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
 };
 
 // Initialize Bootstrap components

@@ -13,14 +13,46 @@ $has_pending = $pending_loan->fetch();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$has_pending) {
     $amount = sanitize($_POST['amount']);
     
-    try {
-        $stmt = $pdo->prepare("INSERT INTO loans (farmer_id, amount) VALUES (?, ?)");
-        $stmt->execute([$farmer_id, $amount]);
-        setFlashMessage('success', 'Loan request submitted successfully!');
-        header('Location: request_loan.php');
-        exit();
-    } catch (PDOException $e) {
-        setFlashMessage('danger', 'Error submitting loan request: ' . $e->getMessage());
+    // Get farmer's qualification metrics
+    $qualification_check = $pdo->prepare("
+        SELECT 
+            COUNT(DISTINCT DATE(created_at)) as days_supplied,
+            COALESCE(AVG(quantity_liters), 0) as avg_daily_liters,
+            COALESCE(SUM(quantity_liters * price_per_liter), 0) as total_income
+        FROM milk_records 
+        WHERE farmer_id = ? 
+        AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
+    $qualification_check->execute([$farmer_id]);
+    $qualifications = $qualification_check->fetch();
+
+    // Define minimum requirements
+    $min_days_supplied = 5; // Must have supplied milk for at least 5 days in the last 30 days
+    $min_daily_liters = 5;   // Must average at least 5 liters per day
+    $max_loan_amount = $qualifications['total_income'] * 0.5; // Can borrow up to 50% of monthly income
+
+    $errors = [];
+    if ($qualifications['days_supplied'] < $min_days_supplied) {
+        $errors[] = "You must supply milk for at least {$min_days_supplied} days in the last 30 days. You have supplied for {$qualifications['days_supplied']} days.";
+    }
+    if ($qualifications['avg_daily_liters'] < $min_daily_liters) {
+        $errors[] = "Your average daily supply must be at least {$min_daily_liters} liters. Your average is " . number_format($qualifications['avg_daily_liters'], 2) . " liters.";
+    }
+    if ($amount > $max_loan_amount) {
+        $errors[] = "Maximum loan amount is 50% of your monthly income (Ksh " . number_format($max_loan_amount, 2) . "). You requested Ksh " . number_format($amount, 2) . ".";
+    }
+
+    if (empty($errors)) {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO loans (farmer_id, amount) VALUES (?, ?)");
+            $stmt->execute([$farmer_id, $amount]);
+            setFlashMessage('success', 'Loan request submitted successfully!');
+            header('Location: request_loan.php');
+            exit();
+        } catch (PDOException $e) {
+            setFlashMessage('danger', 'Error submitting loan request: ' . $e->getMessage());
+        }
+    } else {
+        setFlashMessage('danger', 'Loan request denied:<br>' . implode('<br>', $errors));
     }
 }
 
@@ -148,7 +180,13 @@ $loans = $loan_history->fetchAll();
                                             </div>
                                             <div class="form-text">
                                                 <i class="fas fa-info-circle me-1"></i>
-                                                Minimum loan amount: Ksh 1,000
+                                                Loan Requirements:
+                                                <ul class="mt-2 small">
+                                                    <li>Must have supplied milk for at least 5 days in the last 30 days</li>
+                                                    <li>Average daily supply must be at least 5 liters</li>
+                                                    <li>Maximum loan amount is 50% of your monthly income</li>
+                                                    <li>Minimum loan amount: Ksh 1,000</li>
+                                                </ul>
                                             </div>
                                         </div>
                                         <button type="submit" class="btn btn-success w-100">
