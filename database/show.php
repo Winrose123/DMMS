@@ -9,7 +9,8 @@ if ($table_name === 'milk_records') {
         SELECT 
             mr.*,
             f.id as farmer_id,
-            CONCAT(u.first_name, ' ', u.last_name) as farmer_name
+            CONCAT(u.first_name, ' ', u.last_name) as farmer_name,
+            mr.image_url as image_url
         FROM milk_records mr
         JOIN farmers f ON mr.farmer_id = f.id
         JOIN users u ON f.user_id = u.id

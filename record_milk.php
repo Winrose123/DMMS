@@ -47,8 +47,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $allowed_extensions = ['jpg', 'jpeg', 'png'];
         
         if (in_array($file_extension, $allowed_extensions)) {
-            $image_url = $upload_dir . uniqid() . '.' . $file_extension;
-            move_uploaded_file($_FILES['image']['tmp_name'], $image_url);
+            $unique_filename = uniqid() . '.' . $file_extension;
+            $image_url = $upload_dir . $unique_filename;
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $image_url)) {
+                // Successfully uploaded
+                chmod($image_url, 0644); // Set proper file permissions
+            } else {
+                setFlashMessage('warning', 'Failed to upload image. Record will be saved without an image.');
+                $image_url = null;
+            }
         }
     }
     
@@ -92,6 +99,11 @@ $today_records = $pdo->query("
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1>Record Milk Production</h1>
+                    <div>
+                        <a href="records-view.php" class="btn btn-info">
+                            <i class="fas fa-list"></i> View All Records
+                        </a>
+                    </div>
                 </div>
 
                 <?php if ($flash = getFlashMessage()): ?>
@@ -237,7 +249,7 @@ $today_records = $pdo->query("
 
     <?php include 'partials/app-scripts.php'; ?>
     <script>
-        $(function() {
+        $(document).ready(function() {
             // Image preview functionality
             const previewImage = function(input) {
                 if (input.files && input.files[0]) {
@@ -260,12 +272,12 @@ $today_records = $pdo->query("
             $('[title]').tooltip();
 
             // Handle delete record functionality
-            $(document).on('click', '.deleteRecord', async function(e) {
+            $('.deleteRecord').on('click', function(e) {
                 e.preventDefault();
                 const recordId = $(this).data('recordid');
                 const farmerName = $(this).data('name');
 
-                const result = await Swal.fire({
+                Swal.fire({
                     title: 'Confirm Deletion',
                     html: `Are you sure you want to delete the record for <strong>${farmerName}</strong>?<br>
                            <small class="text-muted">This action cannot be undone.</small>`,
@@ -275,19 +287,17 @@ $today_records = $pdo->query("
                     cancelButtonColor: '#6c757d',
                     confirmButtonText: '<i class="fas fa-trash"></i> Delete',
                     cancelButtonText: '<i class="fas fa-times"></i> Cancel'
-                });
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Show loading state
+                        Swal.fire({
+                            title: 'Deleting...',
+                            html: '<i class="fas fa-spinner fa-spin"></i>',
+                            allowOutsideClick: false,
+                            showConfirmButton: false
+                        });
 
-                if (result.isConfirmed) {
-                    // Show loading state
-                    Swal.fire({
-                        title: 'Deleting...',
-                        html: '<i class="fas fa-spinner fa-spin"></i>',
-                        allowOutsideClick: false,
-                        showConfirmButton: false
-                    });
-
-                    try {
-                        const response = await $.ajax({
+                        $.ajax({
                             method: 'POST',
                             url: 'database/delete.php',
                             data: {
@@ -295,33 +305,36 @@ $today_records = $pdo->query("
                                 table: 'milk_records'
                             },
                             dataType: 'json'
-                        });
-
-                        if (response.success) {
-                            await Swal.fire({
-                                title: 'Success!',
-                                text: response.message || 'Record deleted successfully.',
-                                icon: 'success',
-                                confirmButtonColor: '#198754'
-                            });
-                            window.location.reload();
-                        } else {
-                            await Swal.fire({
-                                title: 'Error!',
-                                text: response.message || 'Failed to delete record.',
+                        })
+                        .done(function(response) {
+                            if (response.success) {
+                                Swal.fire({
+                                    title: 'Success!',
+                                    text: response.message || 'Record deleted successfully.',
+                                    icon: 'success',
+                                    confirmButtonColor: '#198754'
+                                }).then(() => {
+                                    window.location.reload();
+                                });
+                            } else {
+                                Swal.fire({
+                                    title: 'Error!',
+                                    text: response.message || 'Failed to delete record.',
+                                    icon: 'error',
+                                    confirmButtonColor: '#dc3545'
+                                });
+                            }
+                        })
+                        .fail(function() {
+                            Swal.fire({
+                                title: 'Server Error!',
+                                text: 'Failed to process your request. Please try again.',
                                 icon: 'error',
                                 confirmButtonColor: '#dc3545'
                             });
-                        }
-                    } catch (error) {
-                        await Swal.fire({
-                            title: 'Server Error!',
-                            text: 'Failed to process your request. Please try again.',
-                            icon: 'error',
-                            confirmButtonColor: '#dc3545'
                         });
                     }
-                }
+                });
             });
         });
     </script>

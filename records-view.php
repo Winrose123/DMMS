@@ -88,15 +88,17 @@ $milk_records = include('database/show.php');
             color: #34495e;
         }
         .recordImages {
-            max-width: 80px;
-            max-height: 80px;
+            max-width: 100px;
+            max-height: 100px;
             object-fit: cover;
-            border-radius: 4px;
+            border-radius: 6px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
         }
         .recordImages:hover {
-            transform: scale(1.1);
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         .btn-group {
             gap: 5px;
@@ -106,38 +108,10 @@ $milk_records = include('database/show.php');
             padding: 0.4rem 0.8rem;
             font-size: 0.875rem;
         }
-        .btn-outline-primary {
-            border-color: #3498db;
-            color: #3498db;
-        }
-        .btn-outline-primary:hover {
-            background-color: #3498db;
-            color: white;
-        }
-        .btn-outline-danger {
-            border-color: #e74c3c;
-            color: #e74c3c;
-        }
-        .btn-outline-danger:hover {
-            background-color: #e74c3c;
-            color: white;
-        }
-        .usercount {
-            margin-top: 15px;
-            color: #7f8c8d;
-            font-size: 0.9rem;
-            position: sticky;
-            bottom: 0;
-            background: white;
-            padding: 10px 0;
-            border-top: 1px solid #eee;
-        }
-        .table tr:hover {
-            background-color: #f8f9fa;
-        }
         .no-image {
             color: #95a5a6;
             font-size: 0.9rem;
+            font-style: italic;
         }
         .empty-message {
             text-align: center;
@@ -220,8 +194,8 @@ $milk_records = include('database/show.php');
                                         <tr>
                                             <td><?= $index + 1 ?></td>
                                             <td>
-                                                <?php if (!empty($record['image'])): ?>
-                                                    <img class="recordImages" src="uploads/records/<?= htmlspecialchars($record['image']) ?>" 
+                                                <?php if (!empty($record['image_url'])): ?>
+                                                    <img class="recordImages" src="<?= htmlspecialchars($record['image_url']) ?>" 
                                                         alt="Record image" title="Click to view full size"/>
                                                 <?php else: ?>
                                                     <span class="no-image">No image</span>
@@ -276,196 +250,124 @@ $milk_records = include('database/show.php');
     </div>
     <?php include('partials/app-scripts.php');?>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize image preview functionality
-            document.querySelectorAll('.recordImages').forEach(function(img) {
-                img.addEventListener('click', function() {
-                    window.open(this.src, '_blank');
-                });
-                img.style.cursor = 'pointer';
-            });
+        $(document).ready(function() {
+            // Image preview functionality
+            $('.recordImages').on('click', function() {
+                window.open(this.src, '_blank');
+            }).css('cursor', 'pointer');
 
-            // Search functionality
-            const searchInput = document.getElementById('searchInput');
-            const clearSearch = document.getElementById('clearSearch');
-            const table = document.getElementById('recordsTable');
-            const totalRecordsSpan = document.getElementById('totalRecords');
-            let visibleRecords = <?= count($milk_records) ?>;
-
-            function updateTotalRecords() {
-                totalRecordsSpan.textContent = visibleRecords.toLocaleString();
-            }
-
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                visibleRecords = 0;
+            // Search/Filter functionality
+            $('#searchInput').on('input', function() {
+                const searchText = $(this).val().toLowerCase();
+                const $table = $('#recordsTable');
+                const $rows = $table.find('tbody tr').not('.empty-message');
                 
-                table.querySelectorAll('tbody tr').forEach(row => {
-                    let found = false;
-                    row.querySelectorAll('td').forEach(cell => {
-                        if (cell.textContent.toLowerCase().includes(searchTerm)) {
-                            found = true;
-                        }
-                    });
-                    row.style.display = found ? '' : 'none';
-                    if (found) visibleRecords++;
-                });
-                
-                updateTotalRecords();
-            });
-
-            clearSearch.addEventListener('click', function() {
-                searchInput.value = '';
-                table.querySelectorAll('tbody tr').forEach(row => {
-                    row.style.display = '';
-                });
-                visibleRecords = <?= count($milk_records) ?>;
-                updateTotalRecords();
-            });
-
-            // Export to CSV functionality
-            document.getElementById('exportCSV').addEventListener('click', function() {
-                let csv = [];
-                const headers = [];
-                
-                // Get headers
-                table.querySelectorAll('thead th').forEach(th => {
-                    if (th.textContent !== 'Image' && th.textContent !== 'Actions') {
-                        headers.push(th.textContent.trim());
-                    }
-                });
-                csv.push(headers.join(','));
-
-                // Get visible rows
-                table.querySelectorAll('tbody tr').forEach(row => {
-                    if (row.style.display !== 'none') {
-                        const rowData = [];
-                        row.querySelectorAll('td').forEach((cell, index) => {
-                            // Skip image and actions columns
-                            if (index !== 1 && index !== (isAdmin ? 7 : 6)) {
-                                rowData.push('"' + cell.textContent.trim().replace(/"/g, '""') + '"');
-                            }
-                        });
-                        csv.push(rowData.join(','));
+                $rows.each(function() {
+                    const $row = $(this);
+                    const text = $row.find('td').not(':last-child').text().toLowerCase();
+                    if (text.indexOf(searchText) > -1) {
+                        $row.show();
+                    } else {
+                        $row.hide();
                     }
                 });
 
-                const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', 'milk_records_' + new Date().toISOString().split('T')[0] + '.csv');
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // Show/hide empty message
+                const visibleRows = $rows.filter(':visible').length;
+                if (visibleRows === 0) {
+                    if ($table.find('.no-results').length === 0) {
+                        const colSpan = isAdmin ? 8 : 7;
+                        const emptyMessage = `
+                            <tr class="no-results">
+                                <td colspan="${colSpan}" class="empty-message">
+                                    <div>
+                                        <i class="fa fa-search"></i>
+                                        <p>No matching records found</p>
+                                    </div>
+                                </td>
+                            </tr>`;
+                        $table.find('tbody').append(emptyMessage);
+                    }
+                } else {
+                    $table.find('.no-results').remove();
+                }
+            });
+
+            // Clear search
+            $('#clearSearch').on('click', function() {
+                $('#searchInput').val('').trigger('input');
             });
 
             // Print functionality
-            document.getElementById('printRecords').addEventListener('click', function() {
-                const printWindow = window.open('', '', 'height=600,width=800');
-                printWindow.document.write('<html><head><title>Milk Production Records</title>');
-                printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">');
-                printWindow.document.write('<style>body { padding: 20px; } .no-print { display: none; }</style>');
-                printWindow.document.write('</head><body>');
-                printWindow.document.write('<h3 class="mb-4">Milk Production Records</h3>');
-                
-                const tableClone = table.cloneNode(true);
-                // Remove image and actions columns
-                tableClone.querySelectorAll('tr').forEach(row => {
-                    const cells = row.cells;
-                    if (cells.length > 0) {
-                        row.deleteCell(isAdmin ? 7 : 6); // Remove actions column if it exists
-                        row.deleteCell(1); // Remove image column
-                    }
-                });
-                
-                printWindow.document.write(tableClone.outerHTML);
-                printWindow.document.write('</body></html>');
-                printWindow.document.close();
-                printWindow.focus();
-                
-                // Wait for CSS to load
-                setTimeout(() => {
-                    printWindow.print();
-                    printWindow.close();
-                }, 1000);
+            $('#printRecords').on('click', function() {
+                window.print();
             });
 
-            // Handle delete record functionality
-            document.addEventListener('click', function(e) {
-                const targetElement = e.target;
-                if (targetElement.classList.contains('deleteRecord') || targetElement.closest('.deleteRecord')) {
-                    e.preventDefault();
-                    const recordElement = targetElement.classList.contains('deleteRecord') ? 
-                        targetElement : targetElement.closest('.deleteRecord');
-                    const recordId = recordElement.dataset.recordid;
-                    const farmerName = recordElement.dataset.name;
+            // Delete record functionality
+            $('.deleteRecord').on('click', function(e) {
+                e.preventDefault();
+                const recordId = $(this).data('recordid');
+                const farmerName = $(this).data('name');
 
-                    BootstrapDialog.confirm({
-                        type: BootstrapDialog.TYPE_DANGER,
-                        title: '<i class="fa fa-exclamation-triangle"></i> Confirm Deletion',
-                        message: `Are you sure you want to delete the record for <strong>${farmerName}</strong>?<br>
-                                <small class="text-muted">This action cannot be undone.</small>`,
-                        btnOKLabel: '<i class="fa fa-trash"></i> Delete',
-                        btnCancelLabel: '<i class="fa fa-times"></i> Cancel',
-                        btnOKClass: 'btn-danger',
-                        callback: function(isDelete) {
-                            if (isDelete) {
-                                // Show loading state
-                                const loadingDialog = BootstrapDialog.show({
-                                    message: '<i class="fa fa-spinner fa-spin"></i> Deleting record...',
-                                    closable: false
+                Swal.fire({
+                    title: 'Confirm Deletion',
+                    html: `Are you sure you want to delete the record for <strong>${farmerName}</strong>?<br>
+                           <small class="text-muted">This action cannot be undone.</small>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: '<i class="fa fa-trash"></i> Delete',
+                    cancelButtonText: '<i class="fa fa-times"></i> Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Show loading state
+                        Swal.fire({
+                            title: 'Deleting...',
+                            html: '<i class="fa fa-spinner fa-spin"></i>',
+                            allowOutsideClick: false,
+                            showConfirmButton: false
+                        });
+
+                        // Send delete request
+                        $.ajax({
+                            url: 'database/delete.php',
+                            type: 'POST',
+                            data: {
+                                id: recordId,
+                                table: 'milk_records'
+                            },
+                            dataType: 'json'
+                        })
+                        .done(function(response) {
+                            if (response.success) {
+                                Swal.fire({
+                                    title: 'Success!',
+                                    text: response.message || 'Record deleted successfully.',
+                                    icon: 'success',
+                                    confirmButtonColor: '#198754'
+                                }).then(() => {
+                                    window.location.reload();
                                 });
-
-                                $.ajax({
-                                    method: 'POST',
-                                    url: 'database/delete.php',
-                                    data: {
-                                        id: recordId,
-                                        table: 'milk_records'
-                                    },
-                                    dataType: 'json',
-                                    success: function(response) {
-                                        loadingDialog.close();
-                                        
-                                        BootstrapDialog.show({
-                                            type: response.success ? 
-                                                BootstrapDialog.TYPE_SUCCESS : 
-                                                BootstrapDialog.TYPE_DANGER,
-                                            title: response.success ? 'Success' : 'Error',
-                                            message: response.message || 'An error occurred while deleting the record.',
-                                            buttons: [{
-                                                label: 'OK',
-                                                action: function(dialog) {
-                                                    dialog.close();
-                                                    if (response.success) {
-                                                        window.location.reload();
-                                                    }
-                                                }
-                                            }]
-                                        });
-                                    },
-                                    error: function(xhr) {
-                                        loadingDialog.close();
-                                        
-                                        BootstrapDialog.show({
-                                            type: BootstrapDialog.TYPE_DANGER,
-                                            title: 'Server Error',
-                                            message: 'Failed to process your request. Please try again.',
-                                            buttons: [{
-                                                label: 'OK',
-                                                action: function(dialog) {
-                                                    dialog.close();
-                                                }
-                                            }]
-                                        });
-                                    }
+                            } else {
+                                Swal.fire({
+                                    title: 'Error!',
+                                    text: response.message || 'Failed to delete record.',
+                                    icon: 'error',
+                                    confirmButtonColor: '#dc3545'
                                 });
                             }
-                        }
-                    });
-                }
+                        })
+                        .fail(function() {
+                            Swal.fire({
+                                title: 'Server Error!',
+                                text: 'Failed to process your request. Please try again.',
+                                icon: 'error',
+                                confirmButtonColor: '#dc3545'
+                            });
+                        });
+                    }
+                });
             });
         });
     </script>
